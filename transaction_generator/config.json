@@ -1,0 +1,5 @@
+{
+  "output_path": "../shared_folder/requests/",
+  "file_prefix": "transaction_",
+  "file_extension": ".json"
+} 

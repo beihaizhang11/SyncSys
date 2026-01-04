@@ -1,0 +1,73 @@
+{
+  "request_id": "request-001",
+  "client_id": "client-001",
+  "operation": "TRANSACTION",
+  "table": "",
+  "data": {
+    "operations": [
+      {
+        "type": "INSERT",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_id": "a6e5f65f-e93b-4621-aeca-3ab8167a0418",
+            "task_type": "Others",
+            "suggested_colleague": "All",
+            "is_finished": "False",
+            "sender_name": "Bohan, Zhang",
+            "sender_dept": "C/EG-V",
+            "sender_mail": "beihaizhang11@cs.com",
+            "sender_phone": "13501253304",
+            "cc": "",
+            "VIN": "LSVCCAF07P2000204",
+            "carid": "EA267",
+            "car_location": "VLabs",
+            "key_location": "Vlabs Key Cabinet",
+            "task_status": "rejected",
+            "assigned_by": "qinwei@testcompany.com",
+            "accepted_by": "",
+            "deferred_by": "",
+            "finished_by": "",
+            "rejected_by": "",
+            "reject_reason": "",
+            "sent_time": "",
+            "request_start_time": "",
+            "request_end_time": "",
+            "assigned_time": 1652221600,
+            "accepted_time": "",
+            "finished_time": "",
+            "purpose": "",
+            "project": "",
+            "task_description": "",
+            "bg_description": "",
+            "effort": "",
+            "task_dept": "",
+            "additional_comment": ""
+          }
+        }
+      },
+      {
+        "type": "UPDATE",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_status": "in_progress"
+          },
+          "where": {
+            "task_id": "a6e5f65f-e93b-4621-aeca-3ab8167a0418"
+          }
+        }
+      },
+      {
+        "type": "DELETE",
+        "table": "tasks_staff",
+        "data": {
+          "where": {
+            "task_id": "task-001"
+          }
+        }
+      }
+    ]
+  },
+  "timestamp": 1752648135
+}

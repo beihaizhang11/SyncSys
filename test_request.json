@@ -1,0 +1,50 @@
+{
+  "request_id": "VB5SEZF_batch_import_1754890750_187u4ebn",
+  "client_id": "CICNBJSCLAU0363",
+  "operation": "TRANSACTION",
+  "table": "",
+  "data": {
+    "operations": [
+      {
+        "type": "UPDATE",
+        "table": "tickets",
+        "data": {
+          "values": {
+            "comments": "abc"
+          },
+          "where": {
+            "problem_no": "10521211"
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f",
+            "staff_email": "micheal@testcompany.com",
+            "staff_time": 1752221600
+          }
+        }
+      },
+      {
+        "type": "DELETE",
+        "table": "tasks_staff",
+        "data": {
+          "where": {
+            "task_id": "DEMO_TASK_001"
+          }
+        }
+      }
+    ]
+  },
+  "timestamp": 1754890751.0116744,
+  "metadata": {
+    "username": "VB5SEZF",
+    "hostname": "CICNBJSCLAU0363",
+    "to_list":"1@1.com;2@2.com",
+    "cc_list":"3@3.com;4@4.com",
+    "generated_at": "2025-08-11T13:39:11.011677"
+  }
+}

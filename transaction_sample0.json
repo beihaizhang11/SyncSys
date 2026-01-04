@@ -1,0 +1,160 @@
+{
+  "request_id": "upgraded-transaction-test0",
+  "client_id": "test_client_67890",
+  "operation": "TRANSACTION",
+  "table": "",
+  "data": {
+    "operations": [
+      {
+        "type": "INSERT",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f",
+            "task_type": "Others",
+            "suggested_colleague": "All",
+            "is_finished": "False",
+            "sender_name": "Bohan, Zhang",
+            "sender_dept": "C/EG-V",
+            "sender_mail": "beihaizhang11@gmail.com",
+            "sender_phone": "13501253304",
+            "cc": "",
+            "VIN": "LSVCCAF07P2000204",
+            "carid": "EA267",
+            "car_location": "VLabs",
+            "key_location": "Vlabs Key Cabinet",
+            "task_status": "rejected",
+            "assigned_by": "zhaoyudong@testcompany.com",
+            "accepted_by": "",
+            "deferred_by": "",
+            "finished_by": "",
+            "rejected_by": "",
+            "reject_reason": "",
+            "sent_time": "",
+            "request_start_time": "",
+            "request_end_time": "",
+            "assigned_time": 1652221600,
+            "accepted_time": "",
+            "finished_time": "",
+            "purpose": "",
+            "project": "",
+            "task_description": "",
+            "bg_description": "",
+            "effort": "",
+            "task_dept": "",
+            "additional_comment": ""
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_id": "5ee11f05-0959-4bc7-9bb5-4b83389ae6fd",
+            "task_type": "Others",
+            "suggested_colleague": "All",
+            "is_finished": "False",
+            "sender_name": "Beihai, Zhang",
+            "sender_dept": "C/EG-V",
+            "sender_mail": "beihaizhang11@outlook.com",
+            "sender_phone": "13501253305",
+            "cc": "",
+            "VIN": "LSVCCAF07P2000203",
+            "carid": "EA888",
+            "car_location": "VLabs",
+            "key_location": "Vlabs Key Cabinet",
+            "task_status": "finished",
+            "assigned_by": "zhaoyudong@testcompany.com",
+            "accepted_by": "",
+            "deferred_by": "",
+            "finished_by": "",
+            "rejected_by": "",
+            "reject_reason": "",
+            "sent_time": "",
+            "request_start_time": "",
+            "request_end_time": "",
+            "assigned_time": 1652221600,
+            "accepted_time": "",
+            "finished_time": "",
+            "purpose": "",
+            "project": "",
+            "task_description": "",
+            "bg_description": "",
+            "effort": "",
+            "task_dept": "",
+            "additional_comment": ""
+          }
+        }
+      },
+      {
+        "type": "UPDATE",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_status": "finished",
+            "assigned_by": "zhaoyudong@audi.com",
+            "assigned_time": 1752473667
+          },
+          "where": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f"
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f",
+            "staff_email": "walter@white.com",
+            "staff_time": 1752221600
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f",
+            "staff_email": "saul@goodman.com",
+            "staff_time": 1752221600
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f",
+            "staff_email": "kim@wexler.com",
+            "staff_time": 1752221600
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "5ee11f05-0959-4bc7-9bb5-4b83389ae6fd",
+            "staff_email": "jesse@pinkman.com",
+            "staff_time": 1752221600
+          }
+        }
+      },
+      {
+        "type": "DELETE",
+        "table": "tasks_staff",
+        "data": {
+          "where": {
+            "task_id": "5ee11f05-0959-4bc7-9bb5-4b83389ae6fd"
+          }
+        }
+      }
+    ]
+  },
+  "timestamp": 1752221600
+} 

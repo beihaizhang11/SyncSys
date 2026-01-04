@@ -1,0 +1,45 @@
+{
+  "request_id": "upgraded-transaction-test1",
+  "client_id": "test_client_67890",
+  "operation": "TRANSACTION",
+  "table": "",
+  "data": {
+    "operations": [
+      {
+        "type": "UPDATE",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_status": "finished",
+            "assigned_by": "zhaoyudong@bmw.com",
+            "assigned_time": 1752221600
+          },
+          "where": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f"
+          }
+        }
+      },
+      {
+        "type": "DELETE",
+        "table": "tasks_staff",
+        "data": {
+          "where": {
+            "task_id": "DEMO_TASK_001"
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "b9334e95-6140-4c6b-84c3-afff435e830f",
+            "staff_email": "jimmy@testcompany.com",
+            "staff_time": 1752221600
+          }
+        }
+      }
+    ]
+  },
+  "timestamp": 1752221600
+} 

@@ -1,0 +1,48 @@
+{
+  "request_id": "high-level-request",
+  "client_id": "client-001",
+  "operation": "TRANSACTION",
+  "table": "",
+  "data": {
+    "operations": [
+      {
+        "type": "INSERT",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_id": "high-level-task-001",
+            "task_type": "High Level Test",
+            "sender_name": "High Level User",
+            "sender_mail": "highlevel@company.com"
+          }
+        }
+      },
+      {
+        "type": "UPDATE",
+        "table": "tasks",
+        "data": {
+          "values": {
+            "task_status": "assigned",
+            "assigned_by": "manager@company.com",
+            "assigned_time": 1752648135
+          },
+          "where": {
+            "task_id": "high-level-task-001"
+          }
+        }
+      },
+      {
+        "type": "INSERT",
+        "table": "tasks_staff",
+        "data": {
+          "values": {
+            "task_id": "high-level-task-001",
+            "staff_email": "worker@company.com",
+            "staff_time": 1752648135
+          }
+        }
+      }
+    ]
+  },
+  "timestamp": 1752648135
+}

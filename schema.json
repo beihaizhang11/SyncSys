@@ -1,0 +1,192 @@
+{
+  "tables": {
+    "users": {
+      "columns": {
+        "id": "INTEGER",
+        "username": "TEXT NOT NULL UNIQUE",
+        "email": "TEXT NOT NULL UNIQUE",
+        "password_hash": "TEXT NOT NULL",
+        "full_name": "TEXT",
+        "phone": "TEXT",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL",
+        "last_login": "REAL",
+        "is_active": "INTEGER DEFAULT 1",
+        "role": "TEXT DEFAULT 'user'"
+      },
+      "primary_key": "id",
+      "indexes": ["username", "email", "created_at", "is_active"]
+    },
+    "categories": {
+      "columns": {
+        "id": "INTEGER",
+        "name": "TEXT NOT NULL UNIQUE",
+        "description": "TEXT",
+        "parent_id": "INTEGER",
+        "sort_order": "INTEGER DEFAULT 0",
+        "is_active": "INTEGER DEFAULT 1",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL"
+      },
+      "primary_key": "id",
+      "indexes": ["name", "parent_id", "sort_order"]
+    },
+    "products": {
+      "columns": {
+        "id": "INTEGER",
+        "name": "TEXT NOT NULL",
+        "description": "TEXT",
+        "sku": "TEXT UNIQUE",
+        "price": "REAL NOT NULL",
+        "cost_price": "REAL",
+        "stock": "INTEGER DEFAULT 0",
+        "min_stock": "INTEGER DEFAULT 0",
+        "category_id": "INTEGER",
+        "brand": "TEXT",
+        "weight": "REAL",
+        "dimensions": "TEXT",
+        "is_active": "INTEGER DEFAULT 1",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL"
+      },
+      "primary_key": "id",
+      "indexes": ["name", "sku", "category_id", "price", "stock", "is_active"]
+    },
+    "orders": {
+      "columns": {
+        "id": "INTEGER",
+        "order_number": "TEXT NOT NULL UNIQUE",
+        "user_id": "INTEGER NOT NULL",
+        "total_amount": "REAL NOT NULL",
+        "discount_amount": "REAL DEFAULT 0",
+        "tax_amount": "REAL DEFAULT 0",
+        "shipping_amount": "REAL DEFAULT 0",
+        "final_amount": "REAL NOT NULL",
+        "status": "TEXT DEFAULT 'pending'",
+        "payment_status": "TEXT DEFAULT 'unpaid'",
+        "shipping_status": "TEXT DEFAULT 'not_shipped'",
+        "shipping_address": "TEXT",
+        "billing_address": "TEXT",
+        "notes": "TEXT",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL",
+        "shipped_at": "REAL",
+        "delivered_at": "REAL"
+      },
+      "primary_key": "id",
+      "indexes": ["order_number", "user_id", "status", "payment_status", "created_at"]
+    },
+    "order_items": {
+      "columns": {
+        "id": "INTEGER",
+        "order_id": "INTEGER NOT NULL",
+        "product_id": "INTEGER NOT NULL",
+        "product_name": "TEXT NOT NULL",
+        "product_sku": "TEXT",
+        "quantity": "INTEGER NOT NULL",
+        "unit_price": "REAL NOT NULL",
+        "total_price": "REAL NOT NULL",
+        "discount_amount": "REAL DEFAULT 0"
+      },
+      "primary_key": "id",
+      "indexes": ["order_id", "product_id"]
+    },
+    "inventory_logs": {
+      "columns": {
+        "id": "INTEGER",
+        "product_id": "INTEGER NOT NULL",
+        "type": "TEXT NOT NULL",
+        "quantity_change": "INTEGER NOT NULL",
+        "quantity_before": "INTEGER NOT NULL",
+        "quantity_after": "INTEGER NOT NULL",
+        "reason": "TEXT",
+        "reference_id": "INTEGER",
+        "reference_type": "TEXT",
+        "operator_id": "INTEGER",
+        "created_at": "REAL NOT NULL"
+      },
+      "primary_key": "id",
+      "indexes": ["product_id", "type", "created_at", "reference_id"]
+    },
+    "customers": {
+      "columns": {
+        "id": "INTEGER",
+        "customer_code": "TEXT UNIQUE",
+        "company_name": "TEXT",
+        "contact_person": "TEXT",
+        "email": "TEXT",
+        "phone": "TEXT",
+        "mobile": "TEXT",
+        "address": "TEXT",
+        "city": "TEXT",
+        "state": "TEXT",
+        "country": "TEXT",
+        "postal_code": "TEXT",
+        "tax_number": "TEXT",
+        "credit_limit": "REAL DEFAULT 0",
+        "payment_terms": "INTEGER DEFAULT 30",
+        "discount_rate": "REAL DEFAULT 0",
+        "is_active": "INTEGER DEFAULT 1",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL"
+      },
+      "primary_key": "id",
+      "indexes": ["customer_code", "company_name", "email", "is_active"]
+    },
+    "suppliers": {
+      "columns": {
+        "id": "INTEGER",
+        "supplier_code": "TEXT UNIQUE",
+        "company_name": "TEXT NOT NULL",
+        "contact_person": "TEXT",
+        "email": "TEXT",
+        "phone": "TEXT",
+        "mobile": "TEXT",
+        "address": "TEXT",
+        "city": "TEXT",
+        "state": "TEXT",
+        "country": "TEXT",
+        "postal_code": "TEXT",
+        "tax_number": "TEXT",
+        "payment_terms": "INTEGER DEFAULT 30",
+        "is_active": "INTEGER DEFAULT 1",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL"
+      },
+      "primary_key": "id",
+      "indexes": ["supplier_code", "company_name", "email", "is_active"]
+    },
+    "system_logs": {
+      "columns": {
+        "id": "INTEGER",
+        "level": "TEXT NOT NULL",
+        "message": "TEXT NOT NULL",
+        "module": "TEXT",
+        "function": "TEXT",
+        "user_id": "INTEGER",
+        "ip_address": "TEXT",
+        "user_agent": "TEXT",
+        "request_id": "TEXT",
+        "session_id": "TEXT",
+        "extra_data": "TEXT",
+        "created_at": "REAL NOT NULL"
+      },
+      "primary_key": "id",
+      "indexes": ["level", "module", "user_id", "created_at"]
+    },
+    "settings": {
+      "columns": {
+        "id": "INTEGER",
+        "key": "TEXT NOT NULL UNIQUE",
+        "value": "TEXT",
+        "description": "TEXT",
+        "type": "TEXT DEFAULT 'string'",
+        "is_public": "INTEGER DEFAULT 0",
+        "created_at": "REAL NOT NULL",
+        "updated_at": "REAL"
+      },
+      "primary_key": "id",
+      "indexes": ["key", "is_public"]
+    }
+  }
+}

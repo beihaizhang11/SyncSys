@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root created="2025-07-10 14:33:25" version="1.76">
+<Task>
+<LastName>Liu</LastName>
+<FirstName>Yao</FirstName>
+<PrimaryEmail>yao.liu@cariad-technology.cn</PrimaryEmail>
+<JobTitle>System Integration Engineer</JobTitle>
+<UserDept>C|TC-3</UserDept>
+<Alias>D9X41IC</Alias>
+<Company>CARIAD (China) Co., Ltd.</Company>
+<UserPhone>18233214298</UserPhone>
+<City>Beijing</City>
+<TaskID>
+</TaskID>
+<CostDepartment>C|TC-3</CostDepartment>
+<TaskType>VR Update</TaskType>
+<Status>new</Status>
+<SuggestColleague>All</SuggestColleague>
+<isFinished>False</isFinished>
+<AcceptedOn/>
+<FinishedOn/>
+<Sender>Liu, Yao</Sender>
+<Subject/>
+<SentOn/>
+<Timeslot>
+<StartDay>2025-07-15</StartDay>
+<StartTime>09:00</StartTime>
+<EndDay>2025-07-15</EndDay>
+<EndTime>17:00</EndTime>
+</Timeslot>
+<Effort/>
+<TaskOU>
+<OU>C|T</OU>
+<Dept>C|TC</Dept>
+<Div>C|TC-3</Div>
+<Team>
+</Team>
+</TaskOU>
+<AssignedStaff/>
+<AssignedCars>
+<Car CNT="119">
+				<VIN>WAURAEGH7SA000407</VIN>
+				<CarID>EC624</CarID>
+				<Brand>Audi</Brand>
+				<Model>E6</Model>
+				<Plate>京E0919试 </Plate>
+				<Color>
+				</Color>
+				<Project>Series Production</Project>
+			</Car>
+		</AssignedCars>
+<CarLocation>VLabs</CarLocation>
+<Floor>
+</Floor>
+<ParkingLot>
+</ParkingLot>
+<KeyLocation>Others</KeyLocation>
+<Purpose>[Cl6][VR41.6][TBT KW28.5_ Release3][S][E](KW29-30)</Purpose>
+<Description FontSize="8">Dear colleagues,
+
+Could you kindly help to upgrade [Cl6][VR41.6][TBT KW28.5_ Release3][S][E](KW29-30) for EC624, for car key please contact with me via teams or call me directly 1823324298.
+
+Thanks ~</Description>
+<BackgroundDescription>VR upgrade</BackgroundDescription>
+</Task>
+</Root>
+

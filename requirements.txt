@@ -1,0 +1,33 @@
+# SyncSys 数据库同步系统依赖
+# 核心依赖 - Python标准库，无需额外安装
+# sqlite3 - 内置
+# json - 内置
+# os - 内置
+# time - 内置
+# threading - 内置
+# pathlib - 内置
+# uuid - 内置
+# hashlib - 内置
+# logging - 内置
+# concurrent.futures - 内置
+# dataclasses - 内置 (Python 3.7+)
+# typing - 内置 (Python 3.5+)
+# argparse - 内置
+# signal - 内置
+# shutil - 内置
+# datetime - 内置
+
+# 可选依赖（用于增强功能）
+watchdog>=2.1.0     # 文件系统监控（推荐，用于更高效的文件监控）
+# psutil>=5.8.0     # 系统监控（可选，用于性能监控）
+# colorama>=0.4.4   # 彩色终端输出（可选，用于美化日志输出）
+
+# 开发依赖（可选）
+# pytest>=6.0.0    # 单元测试
+# pytest-cov>=2.0.0  # 测试覆盖率
+# black>=21.0.0     # 代码格式化
+# flake8>=3.8.0     # 代码检查
+
+# 注意：本系统设计为零依赖，仅使用Python标准库
+# 这确保了在企业环境中的最大兼容性和最小部署复杂度
+# watchdog是可选依赖，可以显著提高文件监控性能
