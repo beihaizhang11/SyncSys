@@ -602,15 +602,11 @@ class SyncProcessor:
             result = self.db_manager.execute_request(request)
             
             # 检查是否需要发送邮件（仅在数据库操作成功时）
-            if (result.get('status') == 'SUCCESS' and 
-                self.email_sender and 
-                self.email_sender.should_send_email(request_data)):
-                
+            if result.get('status') == 'SUCCESS' and self.email_sender:
                 try:
                     self.email_sender.process_batch_import_request(request_data)
-                    logging.info(f"已处理batch_import邮件发送: {request.request_id}")
                 except Exception as email_error:
-                    logging.error(f"发送batch_import邮件时出错: {email_error}")
+                    logging.error(f"[邮件] 发送邮件时出错: {email_error}")
                     # 邮件发送失败不影响主流程
             
             # 写入响应文件

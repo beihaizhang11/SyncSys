@@ -21,17 +21,6 @@ except ImportError:
 class TicketEmailSender:
     """票据邮件发送器"""
     
-    # 预定义的assignee邮箱映射
-    ASSIGNEE_EMAILS = {
-        "Adlkofer, Thomas": "thomas.adlkofer@audi.com.cn",
-        "Yang Xie": "yang.xie@audi.com.cn", 
-        "Xu, Fangchao": "fangchao.xu@audi.com.cn",
-        "Wang, Zhuwei": "zhuwei.wang@audi.com.cn",
-        "Yanan Wang": "yanan.wang@audi.com.cn",
-        "Yudong Zhao": "yudong.zhao@audi.com.cn",
-        "Han, Yinuo": "extern.yinuo.han@audi.com.cn"
-    }
-    
     def __init__(self, db_manager, config_manager=None):
         """
         初始化邮件发送器
@@ -44,17 +33,25 @@ class TicketEmailSender:
         self.config = config_manager
         
         # 邮件配置
-        self.sender_email = "bohan.zhang1@audi.com.cn"
+        self.sender_email = self._get_sender_email()
         self.enabled = OUTLOOK_AVAILABLE and self._is_email_enabled()
         
-        if not self.enabled:
-            logging.warning("邮件功能已禁用：Outlook不可用或配置禁用")
+        if self.enabled:
+            logging.info(f"[邮件模块] 已启用 (发件人: {self.sender_email})")
+        else:
+            logging.warning("[邮件模块] 已禁用 (Outlook不可用或配置禁用)")
     
     def _is_email_enabled(self) -> bool:
         """检查邮件功能是否启用"""
         if self.config:
             return self.config.get('email.enabled', True)
         return True
+    
+    def _get_sender_email(self) -> str:
+        """获取发件人邮箱"""
+        if self.config:
+            return self.config.get('email.sender', 'bohan.zhang1@audi.com.cn')
+        return 'bohan.zhang1@audi.com.cn'
     
     def should_send_email(self, request_data: Dict[str, Any]) -> bool:
         """
@@ -66,11 +63,13 @@ class TicketEmailSender:
         Returns:
             bool: 是否应该发送邮件
         """
+        request_id = request_data.get('request_id', '')
+        
+        # 检查邮件功能是否启用
         if not self.enabled:
             return False
         
         # 检查是否是batch_import请求
-        request_id = request_data.get('request_id', '')
         if 'batch_import' not in request_id:
             return False
         
@@ -78,96 +77,128 @@ class TicketEmailSender:
         if request_data.get('operation') != 'TRANSACTION':
             return False
         
-        # 检查是否包含UPDATE操作到tickets表
-        operations = request_data.get('data', {}).get('operations', [])
-        for operation in operations:
-            if (operation.get('type') == 'UPDATE' and 
-                operation.get('table') == 'tickets'):
-                return True
+        # 检查metadata中是否有to_list
+        metadata = request_data.get('metadata', {})
+        to_list = metadata.get('to_list', '')
         
-        return False
+        if not metadata or not to_list or not to_list.strip():
+            logging.warning(f"[邮件] 跳过发送: metadata中缺少to_list (request_id={request_id})")
+            return False
+        
+        # 统计操作信息
+        operations = request_data.get('data', {}).get('operations', [])
+        logging.info(f"[邮件] 满足发送条件: {len(operations)}个操作, to={to_list}")
+        
+        return True
     
-    def extract_problem_numbers(self, request_data: Dict[str, Any]) -> List[str]:
+    def get_operations_summary(self, request_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        从请求数据中提取problem_no
+        获取操作摘要信息
         
         Args:
             request_data: 请求数据
             
         Returns:
-            List[str]: problem_no列表
+            List[Dict]: 操作摘要列表
         """
-        problem_numbers = []
         operations = request_data.get('data', {}).get('operations', [])
+        summary = []
         
-        for operation in operations:
-            if (operation.get('type') == 'UPDATE' and 
-                operation.get('table') == 'tickets'):
-                where_clause = operation.get('data', {}).get('where', {})
-                problem_no = where_clause.get('problem_no')
-                if problem_no:
-                    problem_numbers.append(str(problem_no))
+        for i, operation in enumerate(operations):
+            op_type = operation.get('type', 'UNKNOWN')
+            op_table = operation.get('table', 'UNKNOWN')
+            op_data = operation.get('data', {})
+            
+            summary_item = {
+                'index': i + 1,
+                'type': op_type,
+                'table': op_table,
+                'values': op_data.get('values', {}),
+                'where': op_data.get('where', {})
+            }
+            summary.append(summary_item)
         
-        return problem_numbers
+        return summary
     
-    def get_ticket_data(self, problem_no: str) -> Optional[Dict[str, Any]]:
+    def format_operation_detail(self, operation: Dict[str, Any]) -> str:
         """
-        从数据库获取票据数据
+        格式化单个操作的详细信息（HTML）
         
         Args:
-            problem_no: 问题编号
+            operation: 操作信息
             
         Returns:
-            Optional[Dict]: 票据数据，如果不存在则返回None
+            str: HTML格式的操作详情
         """
-        try:
-            import sqlite3
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                
-                cursor.execute(
-                    "SELECT * FROM tickets WHERE problem_no = ?",
-                    (problem_no,)
-                )
-                
-                row = cursor.fetchone()
-                if row:
-                    return dict(row)
-                else:
-                    logging.warning(f"未找到problem_no为{problem_no}的票据")
-                    return None
-                    
-        except Exception as e:
-            logging.error(f"查询票据数据时出错: {e}")
-            return None
+        op_type = operation.get('type', 'UNKNOWN')
+        op_table = operation.get('table', 'UNKNOWN')
+        op_values = operation.get('values', {})
+        op_where = operation.get('where', {})
+        
+        html = f"""
+        <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin: 10px 0;">
+            <h4 style="color: #007bff; margin-top: 0;">
+                操作 #{operation.get('index', '?')}: {op_type} - {op_table}
+            </h4>
+        """
+        
+        # 显示更新的值
+        if op_values:
+            html += """
+            <div style="margin: 10px 0;">
+                <strong style="color: #495057;">更新的值:</strong>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+            """
+            for key, value in op_values.items():
+                # 截断过长的值
+                str_value = str(value)
+                if len(str_value) > 100:
+                    str_value = str_value[:100] + '...'
+                html += f"""
+                    <tr>
+                        <td style="padding: 5px; font-weight: bold; width: 200px; color: #6c757d;">{key}:</td>
+                        <td style="padding: 5px; color: #212529;">{str_value}</td>
+                    </tr>
+                """
+            html += "</table></div>"
+        
+        # 显示条件
+        if op_where:
+            html += """
+            <div style="margin: 10px 0;">
+                <strong style="color: #495057;">条件:</strong>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+            """
+            for key, value in op_where.items():
+                html += f"""
+                    <tr>
+                        <td style="padding: 5px; font-weight: bold; width: 200px; color: #6c757d;">{key}:</td>
+                        <td style="padding: 5px; color: #212529;">{value}</td>
+                    </tr>
+                """
+            html += "</table></div>"
+        
+        html += "</div>"
+        return html
     
-    def get_assignee_email(self, assignee: str) -> Optional[str]:
+    def parse_email_list(self, email_string: str) -> List[str]:
         """
-        获取assignee的邮箱地址
+        解析邮件列表字符串（分号分隔）
         
         Args:
-            assignee: 指派人姓名
+            email_string: 邮件列表字符串，如 "1@1.com;2@2.com"
             
         Returns:
-            Optional[str]: 邮箱地址，如果未找到则返回None
+            List[str]: 邮箱地址列表
         """
-        if not assignee:
-            return None
+        if not email_string:
+            return []
         
-        # 直接匹配
-        if assignee in self.ASSIGNEE_EMAILS:
-            return self.ASSIGNEE_EMAILS[assignee]
+        # 分号分隔，去除空格和空字符串
+        emails = [email.strip() for email in email_string.split(';')]
+        emails = [email for email in emails if email]
         
-        # 模糊匹配（根据姓名关键词）
-        assignee_lower = assignee.lower()
-        for name, email in self.ASSIGNEE_EMAILS.items():
-            if any(part.lower() in assignee_lower for part in name.split() if len(part) > 2):
-                logging.info(f"模糊匹配assignee: {assignee} -> {name} ({email})")
-                return email
-        
-        logging.warning(f"未找到assignee {assignee} 的邮箱地址")
-        return None
+        return emails
     
     def create_outlook_application(self):
         """创建Outlook应用程序实例"""
@@ -181,206 +212,126 @@ class TicketEmailSender:
             logging.error(f'无法连接到Outlook: {e}')
             raise
     
-    def generate_email_subject(self, ticket_data: Dict[str, Any], 
-                             request_data: Dict[str, Any]) -> str:
+    def generate_email_subject(self, request_data: Dict[str, Any]) -> str:
         """
         生成邮件主题
         
         Args:
-            ticket_data: 票据数据
             request_data: 请求数据
             
         Returns:
             str: 邮件主题
         """
-        problem_no = ticket_data.get('problem_no', 'Unknown')
-        ticket_title = ticket_data.get('title', '')
+        metadata = request_data.get('metadata', {})
+        username = metadata.get('username', 'System')
         
-        if ticket_title:
-            return f"Ticket Update Notification: {problem_no} - {ticket_title}"
-        else:
-            return f"Ticket Update Notification: {problem_no}"
+        operations = request_data.get('data', {}).get('operations', [])
+        operations_count = len(operations)
+        
+        # 获取主要操作类型
+        operation_types = list(set([op.get('type', 'UNKNOWN') for op in operations]))
+        operation_types_str = ', '.join(operation_types)
+        
+        return f"Batch Import Notification: {operations_count} Operations by {username}"
     
-    def generate_email_body(self, ticket_data: Dict[str, Any], 
-                          request_data: Dict[str, Any]) -> str:
+    def generate_email_body(self, request_data: Dict[str, Any]) -> str:
         """
         生成邮件正文（HTML格式）
         
         Args:
-            ticket_data: 票据数据
             request_data: 请求数据
             
         Returns:
             str: HTML格式的邮件正文
         """
-        # 获取更新信息
+        # 获取元数据
         metadata = request_data.get('metadata', {})
-        import_info = metadata.get('import_info', {})
-        updated_fields = import_info.get('updated_fields', [])
+        username = metadata.get('username', 'System')
+        hostname = metadata.get('hostname', 'Unknown')
+        generated_at = metadata.get('generated_at', 'N/A')
         
-        # 获取操作中的更新值
-        operations = request_data.get('data', {}).get('operations', [])
-        updated_values = {}
-        for operation in operations:
-            if (operation.get('type') == 'UPDATE' and 
-                operation.get('table') == 'tickets'):
-                updated_values.update(operation.get('data', {}).get('values', {}))
+        # 获取请求信息
+        request_id = request_data.get('request_id', 'Unknown')
+        
+        # 获取操作摘要
+        operations_summary = self.get_operations_summary(request_data)
+        operations_count = len(operations_summary)
+        
+        # 统计操作类型
+        operation_types = {}
+        for op in operations_summary:
+            op_type = op['type']
+            operation_types[op_type] = operation_types.get(op_type, 0) + 1
+        
+        operations_stats = ', '.join([f"{count} {op_type}" for op_type, count in operation_types.items()])
         
         # 生成HTML邮件正文
         html_body = f"""
         <html>
         <body style="font-family: 'Microsoft YaHei', Arial, sans-serif; font-size: 14px; line-height: 1.6;">
-            <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #007bff; margin-bottom: 20px;">KPM System Ticket Update Notification</h2>
+            <div style="max-width: 900px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #007bff; margin-bottom: 20px;">🔔 Batch Import Notification</h2>
                 
-                <p>Dear {ticket_data.get('assignee', 'Team Member')},</p>
+                <p>Dear Team,</p>
                 
-                <p>A ticket assigned to you has been updated in the system. Please review the details below:</p>
+                <p>A batch import operation has been executed in the system. Please review the details below:</p>
                 
-                <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 20px; margin: 20px 0;">
-                    <h3 style="color: #495057; margin-top: 0;">Ticket Information</h3>
+                <div style="background-color: #e3f2fd; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0;">
+                    <h3 style="color: #0d47a1; margin-top: 0;">📊 Request Summary</h3>
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="padding: 8px; font-weight: bold; width: 150px;">Problem No:</td>
-                            <td style="padding: 8px;">{ticket_data.get('problem_no', 'N/A')}</td>
+                            <td style="padding: 8px; font-weight: bold; width: 180px; color: #1565c0;">Request ID:</td>
+                            <td style="padding: 8px; color: #212529;">{request_id}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; font-weight: bold;">Source:</td>
-                            <td style="padding: 8px;">{ticket_data.get('source', 'N/A')}</td>
+                            <td style="padding: 8px; font-weight: bold; color: #1565c0;">Submitted by:</td>
+                            <td style="padding: 8px; color: #212529;">{username}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; font-weight: bold;">Project:</td>
-                            <td style="padding: 8px;">{ticket_data.get('konzernprojekt', 'N/A')}</td>
+                            <td style="padding: 8px; font-weight: bold; color: #1565c0;">Hostname:</td>
+                            <td style="padding: 8px; color: #212529;">{hostname}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; font-weight: bold;">short_text:</td>
-                            <td style="padding: 8px;">{ticket_data.get('short_text', 'N/A')}</td>
+                            <td style="padding: 8px; font-weight: bold; color: #1565c0;">Submitted at:</td>
+                            <td style="padding: 8px; color: #212529;">{generated_at}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; font-weight: bold;">P-Status:</td>
-                            <td style="padding: 8px;">{ticket_data.get('p_status', 'N/A')}</td>
+                            <td style="padding: 8px; font-weight: bold; color: #1565c0;">Total Operations:</td>
+                            <td style="padding: 8px; color: #212529;"><strong>{operations_count}</strong> ({operations_stats})</td>
                         </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">FB-Status:</td>
-                            <td style="padding: 8px;">{ticket_data.get('fb_status', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Shipper:</td>
-                            <td style="padding: 8px;">{ticket_data.get('shipper', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Recipient:</td>
-                            <td style="padding: 8px;">{ticket_data.get('recipient', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Processing Type:</td>
-                            <td style="padding: 8px;">{ticket_data.get('bearbeitungs_auftragsart', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Software:</td>
-                            <td style="padding: 8px;">{ticket_data.get('sw', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Hardware:</td>
-                            <td style="padding: 8px;">{ticket_data.get('hw', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">E-Project:</td>
-                            <td style="padding: 8px;">{ticket_data.get('e_projekt', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Assignee:</td>
-                            <td style="padding: 8px;">{ticket_data.get('assignee', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Priority:</td>
-                            <td style="padding: 8px;">{ticket_data.get('priority', 'N/A')}</td>
-                        </tr>
-                        <tr style="background-color: #ffffff;">
-                            <td style="padding: 8px; font-weight: bold;">Status:</td>
-                            <td style="padding: 8px;">{ticket_data.get('status', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Rating:</td>
-                            <td style="padding: 8px;">{ticket_data.get('rating', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Created Date:</td>
-                            <td style="padding: 8px;">{ticket_data.get('created_at', 'N/A')}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold;">Update Date:</td>
-                            <td style="padding: 8px;">{ticket_data.get('updated_at', 'N/A')}</td>
-                        </tr>
-        """
-        
-        # 添加评论字段（如果存在）
-        if ticket_data.get('comments'):
-            html_body += f"""
-                        <tr style="background-color: #ffffff;">
-                            <td style="padding: 8px; font-weight: bold;">Comments:</td>
-                            <td style="padding: 8px;">{ticket_data.get('comments', 'N/A')}</td>
-                        </tr>
-            """
-        
-        html_body += """
                     </table>
                 </div>
+                
+                <div style="margin: 30px 0;">
+                    <h3 style="color: #495057; border-bottom: 2px solid #007bff; padding-bottom: 10px;">📝 Operations Details</h3>
         """
         
-        # 添加更新信息
-        if updated_fields or updated_values:
-            html_body += """
-                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 20px; margin: 20px 0;">
-                    <h3 style="color: #856404; margin-top: 0;">Update Details</h3>
-            """
-            
-            if updated_fields:
-                html_body += f"""
-                    <p><strong>Updated Fields:</strong> {', '.join(updated_fields)}</p>
-                """
-            
-            if updated_values:
-                html_body += """
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                """
-                for field, value in updated_values.items():
-                    html_body += f"""
-                        <tr>
-                            <td style="padding: 5px; font-weight: bold; width: 150px;">{field.title()}:</td>
-                            <td style="padding: 5px;">{value}</td>
-                        </tr>
-                    """
-                html_body += "</table>"
-            
-            html_body += "</div>"
-        
-        # 添加更新元数据
-        if metadata:
-            html_body += f"""
-                <div style="background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; padding: 15px; margin: 20px 0;">
-                    <h4 style="color: #495057; margin-top: 0;">Update Metadata</h4>
-                    <p><strong>Updated by:</strong> {metadata.get('kmp_username', 'System')}</p>
-                    <p><strong>Update time:</strong> {import_info.get('timestamp', 'N/A')}</p>
-                    <p><strong>Source:</strong> {import_info.get('source', 'N/A')}</p>
-                    <p><strong>Action:</strong> {import_info.get('user_action', 'N/A')}</p>
-                </div>
-            """
+        # 添加每个操作的详细信息
+        for operation in operations_summary:
+            html_body += self.format_operation_detail(operation)
         
         # 结尾
         html_body += """
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
-                    <p>Please review the updated ticket and take any necessary actions.</p>
-                    <p>If you have any questions, please contact the system administrator.</p>
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6;">
+                    <p style="color: #495057;">
+                        <strong>📌 Action Required:</strong><br>
+                        Please review the operations listed above and verify that all changes are correct. 
+                        If you notice any discrepancies, please contact the system administrator immediately.
+                    </p>
                     
-                    <p style="margin-top: 20px;">
+                    <p style="margin-top: 20px; color: #6c757d;">
                         Best regards,<br>
-                        <strong>SyncSys Notification System (AUDI Central Workshop)</strong>
+                        <strong>SyncSys Notification System</strong>
                     </p>
                 </div>
                 
-                <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-left: 3px solid #007bff; font-size: 12px; color: #6c757d;">
-                    <p style="margin: 0;"><strong>Note:</strong> This is an automated notification from the SyncSys system. Please do not reply to this email.</p>
+                <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-left: 3px solid #6c757d; font-size: 12px; color: #6c757d;">
+                    <p style="margin: 0;">
+                        <strong>ℹ️ Note:</strong> This is an automated notification from the SyncSys system. 
+                        Please do not reply to this email. For support, contact your system administrator.
+                    </p>
                 </div>
             </div>
         </body>
@@ -389,59 +340,59 @@ class TicketEmailSender:
         
         return html_body
     
-    def send_notification_email(self, ticket_data: Dict[str, Any], 
-                              request_data: Dict[str, Any]) -> bool:
+    def send_notification_email(self, request_data: Dict[str, Any]) -> bool:
         """
         发送通知邮件
         
         Args:
-            ticket_data: 票据数据
             request_data: 请求数据
             
         Returns:
             bool: 发送是否成功
         """
+        request_id = request_data.get('request_id', 'unknown')
+        
         if not self.enabled:
-            logging.warning("邮件功能未启用，跳过发送")
             return False
         
         outlook = None
         try:
-            # 获取assignee邮箱
-            assignee = ticket_data.get('assignee')
-            assignee_email = self.get_assignee_email(assignee)
+            # 获取metadata中的邮件列表
+            metadata = request_data.get('metadata', {})
+            to_list_str = metadata.get('to_list', '')
+            cc_list_str = metadata.get('cc_list', '')
             
-            if not assignee_email:
-                logging.warning(f"无法获取assignee {assignee} 的邮箱地址，跳过发送")
+            # 解析邮件列表
+            to_emails = self.parse_email_list(to_list_str)
+            cc_emails = self.parse_email_list(cc_list_str)
+            
+            if not to_emails:
+                logging.warning(f"[邮件] 跳过发送: 没有有效收件人")
                 return False
             
-            # 创建Outlook应用
+            # 创建Outlook应用并发送
             outlook = self.create_outlook_application()
-            mail = outlook.CreateItem(0)  # 0 = olMailItem
+            mail = outlook.CreateItem(0)
             
-            # 设置发件人
             mail.SentOnBehalfOfName = self.sender_email
+            mail.To = ';'.join(to_emails)
+            if cc_emails:
+                mail.CC = ';'.join(cc_emails)
             
-            # 设置收件人
-            mail.To = assignee_email
+            mail.Subject = self.generate_email_subject(request_data)
+            mail.HTMLBody = self.generate_email_body(request_data)
+            mail.BodyFormat = 2
             
-            # 设置主题
-            mail.Subject = self.generate_email_subject(ticket_data, request_data)
-            
-            # 设置邮件正文
-            mail.HTMLBody = self.generate_email_body(ticket_data, request_data)
-            mail.BodyFormat = 2  # 2 = olFormatHTML
-            
-            # 发送邮件
             mail.Send()
             
-            logging.info(f"邮件发送成功：problem_no={ticket_data.get('problem_no')}, "
-                        f"assignee={assignee}, email={assignee_email}")
+            # 简化的成功日志
+            cc_info = f", cc={len(cc_emails)}人" if cc_emails else ""
+            logging.info(f"[邮件] 发送成功: to={len(to_emails)}人{cc_info}")
             
             return True
             
         except Exception as e:
-            logging.error(f"发送邮件失败: {e}")
+            logging.error(f"[邮件] 发送失败: {e}")
             return False
         finally:
             # 清理COM资源
@@ -464,44 +415,12 @@ class TicketEmailSender:
             bool: 处理是否成功
         """
         if not self.should_send_email(request_data):
-            logging.debug("不需要发送邮件")
             return True
         
         try:
-            # 提取problem_no列表
-            problem_numbers = self.extract_problem_numbers(request_data)
-            if not problem_numbers:
-                logging.warning("未找到problem_no，跳过邮件发送")
-                return True
-            
-            success_count = 0
-            total_count = len(problem_numbers)
-            
-            # 为每个problem_no发送邮件
-            for problem_no in problem_numbers:
-                # 获取票据数据
-                ticket_data = self.get_ticket_data(problem_no)
-                if not ticket_data:
-                    logging.warning(f"未找到problem_no {problem_no} 的票据数据")
-                    continue
-                
-                # 检查是否有assignee
-                assignee = ticket_data.get('assignee')
-                if not assignee:
-                    logging.info(f"problem_no {problem_no} 没有assignee，跳过邮件发送")
-                    continue
-                
-                # 发送邮件
-                if self.send_notification_email(ticket_data, request_data):
-                    success_count += 1
-                else:
-                    logging.error(f"发送problem_no {problem_no} 的邮件失败")
-            
-            logging.info(f"batch_import邮件发送完成：成功 {success_count}/{total_count}")
-            return success_count > 0 or total_count == 0
-            
+            return self.send_notification_email(request_data)
         except Exception as e:
-            logging.error(f"处理batch_import请求时出错: {e}")
+            logging.error(f"[邮件] 处理失败: {e}")
             return False
 
 # 创建全局邮件发送器实例（延迟初始化）
