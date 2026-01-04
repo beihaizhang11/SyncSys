@@ -601,17 +601,27 @@ class SyncProcessor:
             # 执行数据库操作
             result = self.db_manager.execute_request(request)
             
+            logging.info(f"[处理器] 数据库操作状态: {result.get('status')}")
+            logging.info(f"[处理器] email_sender存在: {self.email_sender is not None}")
+            
             # 检查是否需要发送邮件（仅在数据库操作成功时）
-            if (result.get('status') == 'SUCCESS' and 
-                self.email_sender and 
-                self.email_sender.should_send_email(request_data)):
+            if result.get('status') == 'SUCCESS':
+                logging.info(f"[处理器] 数据库操作成功，检查是否需要发送邮件...")
                 
-                try:
-                    self.email_sender.process_batch_import_request(request_data)
-                    logging.info(f"已处理batch_import邮件发送: {request.request_id}")
-                except Exception as email_error:
-                    logging.error(f"发送batch_import邮件时出错: {email_error}")
-                    # 邮件发送失败不影响主流程
+                if not self.email_sender:
+                    logging.warning(f"[处理器] email_sender未初始化，跳过邮件发送")
+                elif self.email_sender.should_send_email(request_data):
+                    logging.info(f"[处理器] 满足邮件发送条件，开始发送邮件...")
+                    try:
+                        self.email_sender.process_batch_import_request(request_data)
+                        logging.info(f"[处理器] 已处理batch_import邮件发送: {request.request_id}")
+                    except Exception as email_error:
+                        logging.error(f"[处理器] 发送batch_import邮件时出错: {email_error}", exc_info=True)
+                        # 邮件发送失败不影响主流程
+                else:
+                    logging.info(f"[处理器] 不满足邮件发送条件")
+            else:
+                logging.warning(f"[处理器] 数据库操作失败，不发送邮件")
             
             # 写入响应文件
             response_data = {

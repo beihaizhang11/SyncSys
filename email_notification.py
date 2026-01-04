@@ -34,10 +34,17 @@ class TicketEmailSender:
         
         # 邮件配置
         self.sender_email = self._get_sender_email()
+        
+        logging.info(f"[邮件初始化] OUTLOOK_AVAILABLE={OUTLOOK_AVAILABLE}")
+        logging.info(f"[邮件初始化] _is_email_enabled()={self._is_email_enabled()}")
+        logging.info(f"[邮件初始化] sender_email={self.sender_email}")
+        
         self.enabled = OUTLOOK_AVAILABLE and self._is_email_enabled()
         
-        if not self.enabled:
-            logging.warning("邮件功能已禁用：Outlook不可用或配置禁用")
+        if self.enabled:
+            logging.info("✓✓✓ [邮件初始化] 邮件功能已启用")
+        else:
+            logging.warning("✗✗✗ [邮件初始化] 邮件功能已禁用：Outlook不可用或配置禁用")
     
     def _is_email_enabled(self) -> bool:
         """检查邮件功能是否启用"""
@@ -61,33 +68,67 @@ class TicketEmailSender:
         Returns:
             bool: 是否应该发送邮件
         """
+        request_id = request_data.get('request_id', '')
+        
+        # 检查邮件功能是否启用
         if not self.enabled:
+            logging.info(f"[邮件检查] request_id={request_id}: 邮件功能未启用")
             return False
+        
+        logging.info(f"[邮件检查] 开始检查 request_id={request_id}")
         
         # 检查是否是batch_import请求
-        request_id = request_data.get('request_id', '')
         if 'batch_import' not in request_id:
+            logging.info(f"[邮件检查] request_id不包含'batch_import': {request_id}")
             return False
         
+        logging.info(f"[邮件检查] ✓ request_id包含'batch_import'")
+        
         # 检查是否是TRANSACTION操作
-        if request_data.get('operation') != 'TRANSACTION':
+        operation = request_data.get('operation')
+        if operation != 'TRANSACTION':
+            logging.info(f"[邮件检查] operation不是TRANSACTION: {operation}")
             return False
+        
+        logging.info(f"[邮件检查] ✓ operation是TRANSACTION")
         
         # 检查metadata中是否有to_list
         metadata = request_data.get('metadata', {})
         to_list = metadata.get('to_list', '')
-        if not to_list or not to_list.strip():
-            logging.debug("metadata中没有to_list，跳过邮件发送")
+        
+        if not metadata:
+            logging.warning(f"[邮件检查] ✗ 缺少metadata字段")
             return False
+        
+        logging.info(f"[邮件检查] metadata存在: {list(metadata.keys())}")
+        
+        if not to_list or not to_list.strip():
+            logging.warning(f"[邮件检查] ✗ metadata中没有有效的to_list")
+            return False
+        
+        logging.info(f"[邮件检查] ✓ to_list存在: {to_list}")
         
         # 检查是否包含UPDATE操作到tickets表
         operations = request_data.get('data', {}).get('operations', [])
-        for operation in operations:
-            if (operation.get('type') == 'UPDATE' and 
-                operation.get('table') == 'tickets'):
-                return True
+        logging.info(f"[邮件检查] 检查operations: 共{len(operations)}个操作")
         
-        return False
+        has_ticket_update = False
+        for i, operation in enumerate(operations):
+            op_type = operation.get('type')
+            op_table = operation.get('table')
+            logging.info(f"[邮件检查] 操作{i+1}: type={op_type}, table={op_table}")
+            
+            if op_type == 'UPDATE' and op_table == 'tickets':
+                has_ticket_update = True
+                logging.info(f"[邮件检查] ✓ 找到tickets表的UPDATE操作")
+                break
+        
+        if not has_ticket_update:
+            logging.info(f"[邮件检查] ✗ 没有找到tickets表的UPDATE操作")
+            return False
+        
+        logging.info(f"[邮件检查] ✓✓✓ 满足所有邮件发送条件！")
+        return True
     
     def extract_problem_numbers(self, request_data: Dict[str, Any]) -> List[str]:
         """
@@ -397,8 +438,10 @@ class TicketEmailSender:
         Returns:
             bool: 发送是否成功
         """
+        problem_no = ticket_data.get('problem_no', 'unknown')
+        
         if not self.enabled:
-            logging.warning("邮件功能未启用，跳过发送")
+            logging.warning(f"[邮件发送-{problem_no}] 邮件功能未启用，跳过发送")
             return False
         
         outlook = None
@@ -408,45 +451,63 @@ class TicketEmailSender:
             to_list_str = metadata.get('to_list', '')
             cc_list_str = metadata.get('cc_list', '')
             
+            logging.info(f"[邮件发送-{problem_no}] to_list_str='{to_list_str}'")
+            logging.info(f"[邮件发送-{problem_no}] cc_list_str='{cc_list_str}'")
+            
             # 解析邮件列表
             to_emails = self.parse_email_list(to_list_str)
             cc_emails = self.parse_email_list(cc_list_str)
             
+            logging.info(f"[邮件发送-{problem_no}] 解析后to_emails={to_emails}")
+            logging.info(f"[邮件发送-{problem_no}] 解析后cc_emails={cc_emails}")
+            
             if not to_emails:
-                logging.warning("metadata中没有有效的to_list，跳过发送")
+                logging.warning(f"[邮件发送-{problem_no}] metadata中没有有效的to_list，跳过发送")
                 return False
             
             # 创建Outlook应用
+            logging.info(f"[邮件发送-{problem_no}] 正在创建Outlook应用...")
             outlook = self.create_outlook_application()
+            logging.info(f"[邮件发送-{problem_no}] Outlook应用创建成功")
+            
             mail = outlook.CreateItem(0)  # 0 = olMailItem
+            logging.info(f"[邮件发送-{problem_no}] 邮件对象创建成功")
             
             # 设置发件人
             mail.SentOnBehalfOfName = self.sender_email
+            logging.info(f"[邮件发送-{problem_no}] 发件人: {self.sender_email}")
             
             # 设置收件人（分号分隔）
             mail.To = ';'.join(to_emails)
+            logging.info(f"[邮件发送-{problem_no}] 收件人: {mail.To}")
             
             # 设置抄送人（如果有）
             if cc_emails:
                 mail.CC = ';'.join(cc_emails)
+                logging.info(f"[邮件发送-{problem_no}] 抄送人: {mail.CC}")
             
             # 设置主题
-            mail.Subject = self.generate_email_subject(ticket_data, request_data)
+            subject = self.generate_email_subject(ticket_data, request_data)
+            mail.Subject = subject
+            logging.info(f"[邮件发送-{problem_no}] 主题: {subject}")
             
             # 设置邮件正文
             mail.HTMLBody = self.generate_email_body(ticket_data, request_data)
             mail.BodyFormat = 2  # 2 = olFormatHTML
+            logging.info(f"[邮件发送-{problem_no}] 邮件正文已设置")
             
             # 发送邮件
+            logging.info(f"[邮件发送-{problem_no}] 正在发送邮件...")
             mail.Send()
+            logging.info(f"[邮件发送-{problem_no}] ✓✓✓ 邮件发送成功！")
             
-            logging.info(f"邮件发送成功：problem_no={ticket_data.get('problem_no')}, "
+            logging.info(f"邮件发送成功：problem_no={problem_no}, "
                         f"to={to_emails}, cc={cc_emails}")
             
             return True
             
         except Exception as e:
-            logging.error(f"发送邮件失败: {e}")
+            logging.error(f"[邮件发送-{problem_no}] ✗✗✗ 发送邮件失败: {e}", exc_info=True)
             return False
         finally:
             # 清理COM资源
@@ -468,15 +529,20 @@ class TicketEmailSender:
         Returns:
             bool: 处理是否成功
         """
+        request_id = request_data.get('request_id', 'unknown')
+        logging.info(f"[邮件发送] ======== 开始处理邮件发送 request_id={request_id} ========")
+        
         if not self.should_send_email(request_data):
-            logging.debug("不需要发送邮件")
+            logging.info(f"[邮件发送] 不满足邮件发送条件，跳过")
             return True
         
         try:
             # 提取problem_no列表
             problem_numbers = self.extract_problem_numbers(request_data)
+            logging.info(f"[邮件发送] 提取到的problem_no列表: {problem_numbers}")
+            
             if not problem_numbers:
-                logging.warning("未找到problem_no，跳过邮件发送")
+                logging.warning("[邮件发送] 未找到problem_no，跳过邮件发送")
                 return True
             
             success_count = 0
@@ -484,23 +550,28 @@ class TicketEmailSender:
             
             # 为每个problem_no发送邮件
             for problem_no in problem_numbers:
+                logging.info(f"[邮件发送] 正在处理 problem_no={problem_no}")
+                
                 # 获取票据数据
                 ticket_data = self.get_ticket_data(problem_no)
                 if not ticket_data:
-                    logging.warning(f"未找到problem_no {problem_no} 的票据数据")
+                    logging.warning(f"[邮件发送] 未找到problem_no {problem_no} 的票据数据")
                     continue
+                
+                logging.info(f"[邮件发送] 票据数据获取成功，准备发送邮件...")
                 
                 # 发送邮件
                 if self.send_notification_email(ticket_data, request_data):
                     success_count += 1
+                    logging.info(f"[邮件发送] ✓ problem_no {problem_no} 邮件发送成功")
                 else:
-                    logging.error(f"发送problem_no {problem_no} 的邮件失败")
+                    logging.error(f"[邮件发送] ✗ problem_no {problem_no} 邮件发送失败")
             
-            logging.info(f"batch_import邮件发送完成：成功 {success_count}/{total_count}")
+            logging.info(f"[邮件发送] ======== 邮件发送完成：成功 {success_count}/{total_count} ========")
             return success_count > 0 or total_count == 0
             
         except Exception as e:
-            logging.error(f"处理batch_import请求时出错: {e}")
+            logging.error(f"[邮件发送] 处理batch_import请求时出错: {e}", exc_info=True)
             return False
 
 # 创建全局邮件发送器实例（延迟初始化）
