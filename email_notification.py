@@ -21,17 +21,6 @@ except ImportError:
 class TicketEmailSender:
     """票据邮件发送器"""
     
-    # 预定义的assignee邮箱映射
-    ASSIGNEE_EMAILS = {
-        "Adlkofer, Thomas": "thomas.adlkofer@audi.com.cn",
-        "Yang Xie": "yang.xie@audi.com.cn", 
-        "Xu, Fangchao": "fangchao.xu@audi.com.cn",
-        "Wang, Zhuwei": "zhuwei.wang@audi.com.cn",
-        "Yanan Wang": "yanan.wang@audi.com.cn",
-        "Yudong Zhao": "yudong.zhao@audi.com.cn",
-        "Han, Yinuo": "extern.yinuo.han@audi.com.cn"
-    }
-    
     def __init__(self, db_manager, config_manager=None):
         """
         初始化邮件发送器
@@ -44,7 +33,7 @@ class TicketEmailSender:
         self.config = config_manager
         
         # 邮件配置
-        self.sender_email = "bohan.zhang1@audi.com.cn"
+        self.sender_email = self._get_sender_email()
         self.enabled = OUTLOOK_AVAILABLE and self._is_email_enabled()
         
         if not self.enabled:
@@ -55,6 +44,12 @@ class TicketEmailSender:
         if self.config:
             return self.config.get('email.enabled', True)
         return True
+    
+    def _get_sender_email(self) -> str:
+        """获取发件人邮箱"""
+        if self.config:
+            return self.config.get('email.sender', 'bohan.zhang1@audi.com.cn')
+        return 'bohan.zhang1@audi.com.cn'
     
     def should_send_email(self, request_data: Dict[str, Any]) -> bool:
         """
@@ -76,6 +71,13 @@ class TicketEmailSender:
         
         # 检查是否是TRANSACTION操作
         if request_data.get('operation') != 'TRANSACTION':
+            return False
+        
+        # 检查metadata中是否有to_list
+        metadata = request_data.get('metadata', {})
+        to_list = metadata.get('to_list', '')
+        if not to_list or not to_list.strip():
+            logging.debug("metadata中没有to_list，跳过邮件发送")
             return False
         
         # 检查是否包含UPDATE操作到tickets表
@@ -142,32 +144,24 @@ class TicketEmailSender:
             logging.error(f"查询票据数据时出错: {e}")
             return None
     
-    def get_assignee_email(self, assignee: str) -> Optional[str]:
+    def parse_email_list(self, email_string: str) -> List[str]:
         """
-        获取assignee的邮箱地址
+        解析邮件列表字符串（分号分隔）
         
         Args:
-            assignee: 指派人姓名
+            email_string: 邮件列表字符串，如 "1@1.com;2@2.com"
             
         Returns:
-            Optional[str]: 邮箱地址，如果未找到则返回None
+            List[str]: 邮箱地址列表
         """
-        if not assignee:
-            return None
+        if not email_string:
+            return []
         
-        # 直接匹配
-        if assignee in self.ASSIGNEE_EMAILS:
-            return self.ASSIGNEE_EMAILS[assignee]
+        # 分号分隔，去除空格和空字符串
+        emails = [email.strip() for email in email_string.split(';')]
+        emails = [email for email in emails if email]
         
-        # 模糊匹配（根据姓名关键词）
-        assignee_lower = assignee.lower()
-        for name, email in self.ASSIGNEE_EMAILS.items():
-            if any(part.lower() in assignee_lower for part in name.split() if len(part) > 2):
-                logging.info(f"模糊匹配assignee: {assignee} -> {name} ({email})")
-                return email
-        
-        logging.warning(f"未找到assignee {assignee} 的邮箱地址")
-        return None
+        return emails
     
     def create_outlook_application(self):
         """创建Outlook应用程序实例"""
@@ -194,10 +188,10 @@ class TicketEmailSender:
             str: 邮件主题
         """
         problem_no = ticket_data.get('problem_no', 'Unknown')
-        ticket_title = ticket_data.get('title', '')
+        short_text = ticket_data.get('short_text', '')
         
-        if ticket_title:
-            return f"Ticket Update Notification: {problem_no} - {ticket_title}"
+        if short_text:
+            return f"Ticket Update Notification: {problem_no} - {short_text}"
         else:
             return f"Ticket Update Notification: {problem_no}"
     
@@ -226,6 +220,10 @@ class TicketEmailSender:
                 operation.get('table') == 'tickets'):
                 updated_values.update(operation.get('data', {}).get('values', {}))
         
+        # 获取更新者信息
+        metadata = request_data.get('metadata', {})
+        username = metadata.get('username', 'System')
+        
         # 生成HTML邮件正文
         html_body = f"""
         <html>
@@ -233,9 +231,9 @@ class TicketEmailSender:
             <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
                 <h2 style="color: #007bff; margin-bottom: 20px;">KPM System Ticket Update Notification</h2>
                 
-                <p>Dear {ticket_data.get('assignee', 'Team Member')},</p>
+                <p>Dear Team,</p>
                 
-                <p>A ticket assigned to you has been updated in the system. Please review the details below:</p>
+                <p>A ticket has been updated in the system. Please review the details below:</p>
                 
                 <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 20px; margin: 20px 0;">
                     <h3 style="color: #495057; margin-top: 0;">Ticket Information</h3>
@@ -356,14 +354,12 @@ class TicketEmailSender:
             html_body += "</div>"
         
         # 添加更新元数据
-        if metadata:
-            html_body += f"""
+        html_body += f"""
                 <div style="background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; padding: 15px; margin: 20px 0;">
                     <h4 style="color: #495057; margin-top: 0;">Update Metadata</h4>
-                    <p><strong>Updated by:</strong> {metadata.get('kmp_username', 'System')}</p>
-                    <p><strong>Update time:</strong> {import_info.get('timestamp', 'N/A')}</p>
-                    <p><strong>Source:</strong> {import_info.get('source', 'N/A')}</p>
-                    <p><strong>Action:</strong> {import_info.get('user_action', 'N/A')}</p>
+                    <p><strong>Updated by:</strong> {username}</p>
+                    <p><strong>Update time:</strong> {metadata.get('generated_at', 'N/A')}</p>
+                    <p><strong>Hostname:</strong> {metadata.get('hostname', 'N/A')}</p>
                 </div>
             """
         
@@ -407,12 +403,17 @@ class TicketEmailSender:
         
         outlook = None
         try:
-            # 获取assignee邮箱
-            assignee = ticket_data.get('assignee')
-            assignee_email = self.get_assignee_email(assignee)
+            # 获取metadata中的邮件列表
+            metadata = request_data.get('metadata', {})
+            to_list_str = metadata.get('to_list', '')
+            cc_list_str = metadata.get('cc_list', '')
             
-            if not assignee_email:
-                logging.warning(f"无法获取assignee {assignee} 的邮箱地址，跳过发送")
+            # 解析邮件列表
+            to_emails = self.parse_email_list(to_list_str)
+            cc_emails = self.parse_email_list(cc_list_str)
+            
+            if not to_emails:
+                logging.warning("metadata中没有有效的to_list，跳过发送")
                 return False
             
             # 创建Outlook应用
@@ -422,8 +423,12 @@ class TicketEmailSender:
             # 设置发件人
             mail.SentOnBehalfOfName = self.sender_email
             
-            # 设置收件人
-            mail.To = assignee_email
+            # 设置收件人（分号分隔）
+            mail.To = ';'.join(to_emails)
+            
+            # 设置抄送人（如果有）
+            if cc_emails:
+                mail.CC = ';'.join(cc_emails)
             
             # 设置主题
             mail.Subject = self.generate_email_subject(ticket_data, request_data)
@@ -436,7 +441,7 @@ class TicketEmailSender:
             mail.Send()
             
             logging.info(f"邮件发送成功：problem_no={ticket_data.get('problem_no')}, "
-                        f"assignee={assignee}, email={assignee_email}")
+                        f"to={to_emails}, cc={cc_emails}")
             
             return True
             
@@ -483,12 +488,6 @@ class TicketEmailSender:
                 ticket_data = self.get_ticket_data(problem_no)
                 if not ticket_data:
                     logging.warning(f"未找到problem_no {problem_no} 的票据数据")
-                    continue
-                
-                # 检查是否有assignee
-                assignee = ticket_data.get('assignee')
-                if not assignee:
-                    logging.info(f"problem_no {problem_no} 没有assignee，跳过邮件发送")
                     continue
                 
                 # 发送邮件
