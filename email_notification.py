@@ -108,24 +108,14 @@ class TicketEmailSender:
         
         logging.info(f"[邮件检查] ✓ to_list存在: {to_list}")
         
-        # 检查是否包含UPDATE操作到tickets表
+        # 记录operations信息（用于调试）
         operations = request_data.get('data', {}).get('operations', [])
         logging.info(f"[邮件检查] 检查operations: 共{len(operations)}个操作")
         
-        has_ticket_update = False
         for i, operation in enumerate(operations):
             op_type = operation.get('type')
             op_table = operation.get('table')
             logging.info(f"[邮件检查] 操作{i+1}: type={op_type}, table={op_table}")
-            
-            if op_type == 'UPDATE' and op_table == 'tickets':
-                has_ticket_update = True
-                logging.info(f"[邮件检查] ✓ 找到tickets表的UPDATE操作")
-                break
-        
-        if not has_ticket_update:
-            logging.info(f"[邮件检查] ✗ 没有找到tickets表的UPDATE操作")
-            return False
         
         logging.info(f"[邮件检查] ✓✓✓ 满足所有邮件发送条件！")
         return True
