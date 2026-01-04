@@ -151,28 +151,25 @@ if OUTLOOK_AVAILABLE:
 else:
     print("   ✗ win32com不可用，跳过Outlook测试")
 
-# 8. 提取problem_no并检查数据库
-print("\n8. 测试数据库查询...")
-if email_sender and test_request and db_manager:
+# 8. 测试操作摘要提取
+print("\n8. 测试操作摘要提取...")
+if email_sender and test_request:
     try:
-        problem_numbers = email_sender.extract_problem_numbers(test_request)
-        print(f"   - 提取的problem_no: {problem_numbers}")
+        operations_summary = email_sender.get_operations_summary(test_request)
+        print(f"   - 操作数量: {len(operations_summary)}")
         
-        if problem_numbers:
-            for problem_no in problem_numbers:
-                ticket_data = email_sender.get_ticket_data(problem_no)
-                if ticket_data:
-                    print(f"   ✓ 找到票据数据: problem_no={problem_no}")
-                    print(f"     - short_text: {ticket_data.get('short_text', 'N/A')}")
-                    print(f"     - status: {ticket_data.get('status', 'N/A')}")
-                else:
-                    print(f"   ✗ 未找到票据数据: problem_no={problem_no}")
+        for op in operations_summary:
+            print(f"   操作{op['index']}: {op['type']} {op['table']}")
+            if op['values']:
+                print(f"     更新值: {list(op['values'].keys())}")
+            if op['where']:
+                print(f"     条件: {op['where']}")
     except Exception as e:
-        print(f"   ✗ 数据库查询失败: {e}")
+        print(f"   ✗ 操作摘要提取失败: {e}")
         import traceback
         traceback.print_exc()
 else:
-    print("   ✗ 邮件发送器或数据库管理器未准备好")
+    print("   ✗ 邮件发送器或测试请求未准备好")
 
 # 总结
 print("\n" + "=" * 80)
@@ -196,7 +193,7 @@ print("\n如果所有检查都通过但仍然无法发送邮件，请：")
 print("1. 检查日志文件 syncsys.log")
 print("2. 确认request_id包含'batch_import'")
 print("3. 确认metadata中有to_list")
-print("4. 确认包含对tickets表的UPDATE操作")
+print("4. 确认operation为'TRANSACTION'")
 print("5. 确认Outlook已安装并正确配置")
 
 print("\n" + "=" * 80)
