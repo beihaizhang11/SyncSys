@@ -34,17 +34,12 @@ class TicketEmailSender:
         
         # 邮件配置
         self.sender_email = self._get_sender_email()
-        
-        logging.info(f"[邮件初始化] OUTLOOK_AVAILABLE={OUTLOOK_AVAILABLE}")
-        logging.info(f"[邮件初始化] _is_email_enabled()={self._is_email_enabled()}")
-        logging.info(f"[邮件初始化] sender_email={self.sender_email}")
-        
         self.enabled = OUTLOOK_AVAILABLE and self._is_email_enabled()
         
         if self.enabled:
-            logging.info("✓✓✓ [邮件初始化] 邮件功能已启用")
+            logging.info(f"[邮件模块] 已启用 (发件人: {self.sender_email})")
         else:
-            logging.warning("✗✗✗ [邮件初始化] 邮件功能已禁用：Outlook不可用或配置禁用")
+            logging.warning("[邮件模块] 已禁用 (Outlook不可用或配置禁用)")
     
     def _is_email_enabled(self) -> bool:
         """检查邮件功能是否启用"""
@@ -72,52 +67,28 @@ class TicketEmailSender:
         
         # 检查邮件功能是否启用
         if not self.enabled:
-            logging.info(f"[邮件检查] request_id={request_id}: 邮件功能未启用")
             return False
-        
-        logging.info(f"[邮件检查] 开始检查 request_id={request_id}")
         
         # 检查是否是batch_import请求
         if 'batch_import' not in request_id:
-            logging.info(f"[邮件检查] request_id不包含'batch_import': {request_id}")
             return False
-        
-        logging.info(f"[邮件检查] ✓ request_id包含'batch_import'")
         
         # 检查是否是TRANSACTION操作
-        operation = request_data.get('operation')
-        if operation != 'TRANSACTION':
-            logging.info(f"[邮件检查] operation不是TRANSACTION: {operation}")
+        if request_data.get('operation') != 'TRANSACTION':
             return False
-        
-        logging.info(f"[邮件检查] ✓ operation是TRANSACTION")
         
         # 检查metadata中是否有to_list
         metadata = request_data.get('metadata', {})
         to_list = metadata.get('to_list', '')
         
-        if not metadata:
-            logging.warning(f"[邮件检查] ✗ 缺少metadata字段")
+        if not metadata or not to_list or not to_list.strip():
+            logging.warning(f"[邮件] 跳过发送: metadata中缺少to_list (request_id={request_id})")
             return False
         
-        logging.info(f"[邮件检查] metadata存在: {list(metadata.keys())}")
-        
-        if not to_list or not to_list.strip():
-            logging.warning(f"[邮件检查] ✗ metadata中没有有效的to_list")
-            return False
-        
-        logging.info(f"[邮件检查] ✓ to_list存在: {to_list}")
-        
-        # 记录operations信息（用于调试）
+        # 统计操作信息
         operations = request_data.get('data', {}).get('operations', [])
-        logging.info(f"[邮件检查] 检查operations: 共{len(operations)}个操作")
+        logging.info(f"[邮件] 满足发送条件: {len(operations)}个操作, to={to_list}")
         
-        for i, operation in enumerate(operations):
-            op_type = operation.get('type')
-            op_table = operation.get('table')
-            logging.info(f"[邮件检查] 操作{i+1}: type={op_type}, table={op_table}")
-        
-        logging.info(f"[邮件检查] ✓✓✓ 满足所有邮件发送条件！")
         return True
     
     def get_operations_summary(self, request_data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -382,7 +353,6 @@ class TicketEmailSender:
         request_id = request_data.get('request_id', 'unknown')
         
         if not self.enabled:
-            logging.warning(f"[邮件发送-{request_id}] 邮件功能未启用，跳过发送")
             return False
         
         outlook = None
@@ -392,63 +362,37 @@ class TicketEmailSender:
             to_list_str = metadata.get('to_list', '')
             cc_list_str = metadata.get('cc_list', '')
             
-            logging.info(f"[邮件发送-{request_id}] to_list_str='{to_list_str}'")
-            logging.info(f"[邮件发送-{request_id}] cc_list_str='{cc_list_str}'")
-            
             # 解析邮件列表
             to_emails = self.parse_email_list(to_list_str)
             cc_emails = self.parse_email_list(cc_list_str)
             
-            logging.info(f"[邮件发送-{request_id}] 解析后to_emails={to_emails}")
-            logging.info(f"[邮件发送-{request_id}] 解析后cc_emails={cc_emails}")
-            
             if not to_emails:
-                logging.warning(f"[邮件发送-{request_id}] metadata中没有有效的to_list，跳过发送")
+                logging.warning(f"[邮件] 跳过发送: 没有有效收件人")
                 return False
             
-            # 创建Outlook应用
-            logging.info(f"[邮件发送-{request_id}] 正在创建Outlook应用...")
+            # 创建Outlook应用并发送
             outlook = self.create_outlook_application()
-            logging.info(f"[邮件发送-{request_id}] Outlook应用创建成功")
+            mail = outlook.CreateItem(0)
             
-            mail = outlook.CreateItem(0)  # 0 = olMailItem
-            logging.info(f"[邮件发送-{request_id}] 邮件对象创建成功")
-            
-            # 设置发件人
             mail.SentOnBehalfOfName = self.sender_email
-            logging.info(f"[邮件发送-{request_id}] 发件人: {self.sender_email}")
-            
-            # 设置收件人（分号分隔）
             mail.To = ';'.join(to_emails)
-            logging.info(f"[邮件发送-{request_id}] 收件人: {mail.To}")
-            
-            # 设置抄送人（如果有）
             if cc_emails:
                 mail.CC = ';'.join(cc_emails)
-                logging.info(f"[邮件发送-{request_id}] 抄送人: {mail.CC}")
             
-            # 设置主题
-            subject = self.generate_email_subject(request_data)
-            mail.Subject = subject
-            logging.info(f"[邮件发送-{request_id}] 主题: {subject}")
-            
-            # 设置邮件正文
+            mail.Subject = self.generate_email_subject(request_data)
             mail.HTMLBody = self.generate_email_body(request_data)
-            mail.BodyFormat = 2  # 2 = olFormatHTML
-            logging.info(f"[邮件发送-{request_id}] 邮件正文已设置")
+            mail.BodyFormat = 2
             
-            # 发送邮件
-            logging.info(f"[邮件发送-{request_id}] 正在发送邮件...")
             mail.Send()
-            logging.info(f"[邮件发送-{request_id}] ✓✓✓ 邮件发送成功！")
             
-            logging.info(f"邮件发送成功：request_id={request_id}, "
-                        f"to={to_emails}, cc={cc_emails}")
+            # 简化的成功日志
+            cc_info = f", cc={len(cc_emails)}人" if cc_emails else ""
+            logging.info(f"[邮件] 发送成功: to={len(to_emails)}人{cc_info}")
             
             return True
             
         except Exception as e:
-            logging.error(f"[邮件发送-{request_id}] ✗✗✗ 发送邮件失败: {e}", exc_info=True)
+            logging.error(f"[邮件] 发送失败: {e}")
             return False
         finally:
             # 清理COM资源
@@ -470,32 +414,13 @@ class TicketEmailSender:
         Returns:
             bool: 处理是否成功
         """
-        request_id = request_data.get('request_id', 'unknown')
-        logging.info(f"[邮件发送] ======== 开始处理邮件发送 request_id={request_id} ========")
-        
         if not self.should_send_email(request_data):
-            logging.info(f"[邮件发送] 不满足邮件发送条件，跳过")
             return True
         
         try:
-            # 获取操作摘要
-            operations_summary = self.get_operations_summary(request_data)
-            logging.info(f"[邮件发送] 操作数量: {len(operations_summary)}")
-            
-            # 发送一封汇总邮件（包含所有操作）
-            logging.info(f"[邮件发送] 准备发送汇总邮件...")
-            
-            if self.send_notification_email(request_data):
-                logging.info(f"[邮件发送] ✓✓✓ 邮件发送成功")
-                logging.info(f"[邮件发送] ======== 邮件发送完成 ========")
-                return True
-            else:
-                logging.error(f"[邮件发送] ✗✗✗ 邮件发送失败")
-                logging.info(f"[邮件发送] ======== 邮件发送完成（失败） ========")
-                return False
-            
+            return self.send_notification_email(request_data)
         except Exception as e:
-            logging.error(f"[邮件发送] 处理batch_import请求时出错: {e}", exc_info=True)
+            logging.error(f"[邮件] 处理失败: {e}")
             return False
 
 # 创建全局邮件发送器实例（延迟初始化）
